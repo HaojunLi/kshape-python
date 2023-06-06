@@ -5,8 +5,17 @@ from numpy.random import randint
 from numpy.linalg import norm, eigh
 from numpy.fft import fft, ifft
 
+# function for z-normalization
+'''
+Parameters:
+a: the data used to be z-normalized
+axis: axis along which the computation is performed
+ddof: ddof of numpy.std. Means Delta Degrees of Freedom.
 
+Return: z-normalized result
+'''
 def zscore(a, axis=0, ddof=0):
+    # CONTINUE
     a = np.asanyarray(a)
     mns = a.mean(axis=axis)
     sstd = a.std(axis=axis, ddof=ddof)
