@@ -15,11 +15,10 @@ ddof: ddof of numpy.std. Means Delta Degrees of Freedom.
 Return: z-normalized result
 '''
 def zscore(a, axis=0, ddof=0):
-    # CONTINUE
     a = np.asanyarray(a)
     mns = a.mean(axis=axis)
     sstd = a.std(axis=axis, ddof=ddof)
-
+    # If axis != 0 and dimension doesn't match
     if axis and mns.ndim < a.ndim:
         res = ((a - np.expand_dims(mns, axis=axis)) /
                np.expand_dims(sstd, axis=axis))
@@ -28,13 +27,21 @@ def zscore(a, axis=0, ddof=0):
 
     return np.nan_to_num(res)
 
+# shifting performed along given axis
+'''
+Parameters:
+a: the data to be shifted
+shift: shift amount
+axis: shift along which axis
 
+Return: shifted result
+'''
 def roll_zeropad(a, shift, axis=None):
     a = np.asanyarray(a)
 
     if shift == 0:
         return a
-
+    # If no axis is provided, flat the array and shift
     if axis is None:
         n = a.size
         reshape = True
@@ -57,14 +64,24 @@ def roll_zeropad(a, shift, axis=None):
     else:
         return res
 
+# Normalized Cross Correlation c
+'''
+Parameter:
+data: data used to compute NCCc
 
+Return: Computed NCCc
+'''
 def _ncc_c_3dim(data):
     x, y = data[0], data[1]
     den = norm(x, axis=(0, 1)) * norm(y, axis=(0, 1))
-
+    # Why do we need this??
     if den < 1e-9:
         den = np.inf
+    # I believe that if dimension is 2 for x and y, we should use fft2 and ifft2. For 2 dim, I believe that the result should be a larger matrix.
+    # also, I think univariate should be separated from multivariate instead of adding extra axis.
 
+    # I believe that padding along axis = 0 is incorrect. Because, in multivariate case, axis = 0 represents how many time series and we shouldn't add new time series. shape[1]
+    # ??????? Need to be discussed
     x_len = x.shape[0]
     fft_size = 1 << (2*x_len-1).bit_length()
 
@@ -73,8 +90,16 @@ def _ncc_c_3dim(data):
 
     return np.real(cc).sum(axis=-1) / den
 
+# Perform SBD computation
+'''
+Parameters:
+x: reference data
+y: data that will be shifted
 
+Return: shifted y
+'''
 def _sbd(x, y):
+    # Continue
     ncc = _ncc_c_3dim([x, y])
     idx = np.argmax(ncc)
     yshift = roll_zeropad(y, (idx + 1) - max(len(x), len(y)))
