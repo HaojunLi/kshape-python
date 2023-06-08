@@ -99,14 +99,27 @@ y: data that will be shifted
 Return: shifted y
 '''
 def _sbd(x, y):
-    # Continue
+    '''
+    Based on discussion with John, SBD is supposed to have two situations.
+    The first situation is line by line alignment (local-wise alignment)
+    The second situation is 2D aligmment (global-wise alignment)
+
+    Also, we should ignore the up-and-down shifting but only focus on left-and-right shifting.
+    '''
     ncc = _ncc_c_3dim([x, y])
     idx = np.argmax(ncc)
+    # I believe that len(x) is equal to len(y) because they are supposed to have the same dimension.
     yshift = roll_zeropad(y, (idx + 1) - max(len(x), len(y)))
 
     return yshift
 
+# Collective shifting
+'''
+Parameter:
+data: data that contains time-series and centroid
 
+Return: "aligned" result
+'''
 def collect_shift(data):
     x, cur_center = data[0], data[1]
     if np.all(cur_center==0):
@@ -114,10 +127,20 @@ def collect_shift(data):
     else:
         return _sbd(cur_center, x)
 
+# ShapeExtraction in the paper
+'''
+Parameters:
+idx: vector that contains the assignment of n time series to k clusters
+x: time series data
+j: centroid index
+cur_center: current centroid
 
+Return: new centroid
+'''
 def _extract_shape(idx, x, j, cur_center):
     pool = multiprocessing.Pool()
     args = []
+    # Find time series in current cluster
     for i in range(len(idx)):
         if idx[i] == j:
             args.append([x[i], cur_center])
@@ -131,8 +154,13 @@ def _extract_shape(idx, x, j, cur_center):
         #return np.zeros((x.shape[1]))
 
     columns = a.shape[1]
+    # why normalize along axis = 1 instead of 0???
+    # We should normalize each time series.
     y = zscore(a, axis=1, ddof=1)
 
+    # Following John's advise, we compute centroid for each line pair separately then concatenate them to generate a new one.
+
+    # why y[:,:, 0]?? I believe that we can compute directly for univariate.
     s = np.dot(y[:, :, 0].transpose(), y[:, :, 0])
     p = np.empty((columns, columns))
     p.fill(1.0/columns)
@@ -141,7 +169,7 @@ def _extract_shape(idx, x, j, cur_center):
 
     _, vec = eigh(m)
     centroid = vec[:, -1]
-
+    # Why these steps are needed????
     finddistance1 = np.sum(np.linalg.norm(a - centroid.reshape((x.shape[1], 1)), axis=(1, 2)))
     finddistance2 = np.sum(np.linalg.norm(a + centroid.reshape((x.shape[1], 1)), axis=(1, 2)))
 
@@ -150,7 +178,18 @@ def _extract_shape(idx, x, j, cur_center):
 
     return zscore(centroid, ddof=1)
 
+# KShape helper function
+''''
+Parameters:
+x: time series data
+k: k clusters
+centroid_init: method to initialize centroids
+max_iter: maximum iterations
 
+Returns:
+idx: the assignments of n time series to k clusters
+centroids: k centroids
+'''
 def _kshape(x, k, centroid_init='zero', max_iter=100):
     m = x.shape[0]
     idx = randint(0, k, size=m)
@@ -165,6 +204,8 @@ def _kshape(x, k, centroid_init='zero', max_iter=100):
         old_idx = idx
 
         for j in range(k):
+            # It is wrong to use column, we should use row??????
+            # Also based on algorithm 3, this is unneccessary.
             for d in range(x.shape[2]):
                 centroids[j, :, d] = _extract_shape(idx, np.expand_dims(x[:, :, d], axis=2), j, np.expand_dims(centroids[j, :, d], axis=1))
                 #centroids[j] = np.expand_dims(_extract_shape(idx, x, j, centroids[j]), axis=1)
@@ -188,7 +229,16 @@ def _kshape(x, k, centroid_init='zero', max_iter=100):
 
     return idx, centroids
 
+# KShape function
+'''
+Parameters:
+x: time series data
+k: k clusters
+centroid_init: method to initialize centroid
+max_iter: maximum iterations
 
+Return: clusters
+'''
 def kshape(x, k, centroid_init='zero', max_iter=100):
     idx, centroids = _kshape(np.array(x), k, centroid_init=centroid_init, max_iter=max_iter)
     clusters = []
