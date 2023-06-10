@@ -77,7 +77,7 @@ def _ncc_c_3dim(data):
     # Why do we need this??
     if den < 1e-9:
         den = np.inf
-    # I believe that if dimension is 2 for x and y, we should use fft2 and ifft2. For 2 dim, I believe that the result should be a larger matrix.
+    # I believe that if dimension is 2 for x and y, we should use fft2 and ifft2.
     # also, I think univariate should be separated from multivariate instead of adding extra axis.
 
     # I believe that padding along axis = 0 is incorrect. Because, in multivariate case, axis = 0 represents how many time series and we shouldn't add new time series. shape[1]
@@ -87,7 +87,7 @@ def _ncc_c_3dim(data):
 
     cc = ifft(fft(x, fft_size, axis=0) * np.conj(fft(y, fft_size, axis=0)), axis=0)
     cc = np.concatenate((cc[-(x_len-1):], cc[:x_len]), axis=0)
-
+    # Why we only keep the real part instead of all parts?????
     return np.real(cc).sum(axis=-1) / den
 
 # Perform SBD computation
@@ -154,13 +154,12 @@ def _extract_shape(idx, x, j, cur_center):
         #return np.zeros((x.shape[1]))
 
     columns = a.shape[1]
-    # why normalize along axis = 1 instead of 0???
-    # We should normalize each time series.
     y = zscore(a, axis=1, ddof=1)
 
     # Following John's advise, we compute centroid for each line pair separately then concatenate them to generate a new one.
 
     # why y[:,:, 0]?? I believe that we can compute directly for univariate.
+    # For multivariate, John and I have hard time to prove these computations are correct or not. Thus, John proposed his advise.
     s = np.dot(y[:, :, 0].transpose(), y[:, :, 0])
     p = np.empty((columns, columns))
     p.fill(1.0/columns)
@@ -204,9 +203,8 @@ def _kshape(x, k, centroid_init='zero', max_iter=100):
         old_idx = idx
 
         for j in range(k):
-            # It is wrong to use column, we should use row??????
-            # Also based on algorithm 3, this is unneccessary.
             for d in range(x.shape[2]):
+                # I think here is equal to John's advice about centroid.....
                 centroids[j, :, d] = _extract_shape(idx, np.expand_dims(x[:, :, d], axis=2), j, np.expand_dims(centroids[j, :, d], axis=1))
                 #centroids[j] = np.expand_dims(_extract_shape(idx, x, j, centroids[j]), axis=1)
 
